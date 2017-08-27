@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Snap Test</title>
+
+<link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="/css/index.css"/>
+
+<script src="/js/lib/jquery.min.js"></script>
+<script src="/js/lib/handlebars-v4.0.5.js"></script>
+<script src="/js/Snap2.js"></script>
+<script src="/js/snap-examples/nav.js"></script>
+<!-- <script src="/js/ObjectFilter.js"></script> -->
+
+<link rel="stylesheet" type="text/css" href="/js/lib/slick/slick.css"/>
+<link rel="stylesheet" type="text/css" href="/js/lib/slick/slick-theme.css"/>
+<script type="text/javascript" src="/js/lib/slick/slick.min.js"></script>
+
+<script type="text/javascript">
+
+function formatCode(str){
+	return str.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+</script>
+</head>
+
+<body>
+
+<div data-tmpl="body"></div>
+<div data-tmpl="test"></div>
+<div data-tmpl="test"></div>
+
+<button onclick="test1()">test 1</button>
+<button onclick="test2()">test 2</button>
+<button onclick="test3()">test 3</button>
+<button onclick="test4()">test 4</button>
+<button onclick="test5()">test 5</button>
+
+<input onkeyup="Snap.setData('test',{name:this.value})">
+
+<script type="text/javascript">
+
+	Snap.setData('list',[
+		{
+			id:2,
+			name:'a'
+		},
+		{
+			id:3,
+			name:'c'
+		},
+		{
+			id:1,
+			name:'e'
+		},
+		{
+			id:4,
+			name:'d'
+		}
+	])
+
+	Snap.setTemplate('list','{{#each this}}<hr><h4>{{name}} {{id}}</h4>{{/each}}')
+
+	Snap.setFilter('list-item',function(data,el){
+		//return data
+		var id = $(el).attr('item-id')
+		return $.grep(data,function(e,i){
+			console.log(id,i,e)
+			return String(e.id)===id
+		})
+	})
+
+	Snap.setTemplate('body',`
+	<div class="panel">
+		<h2>Body Tmpl {{hello}}</h2>
+		<div data-tmpl="test"></div>
+		<div data-tmpl="list"></div>
+		<hr>
+		<div data-tmpl="list" data-filter="list-item" item-id="4" onclick="console.log(Snap.getData(this))"></div>
+		<div data-tmpl="timer"></div>
+	</div>`)
+
+	Snap.setData('timer',{n:0})
+
+	Snap.setProcess('timer',function(d){
+		d.display = ('0000'+d.n).slice(-5)
+		return d
+	})
+
+	Snap.setTemplate('timer','{{display}}')
+
+	setInterval(function(){
+		Snap.setData('timer',function(d){
+			if(!d.n) d.n = 0
+			d.n++
+			return d
+		})
+	},10)
+
+	Snap.setTemplate('fullname','{{firstname}} {{lastname}}')
+	
+	function test1(){
+		Snap.setTemplate('test','My dad is: {{{name}}} {{>fullname}}')
+	}
+
+	function test2(){
+		Snap.setData('test',{firstname:'dude', lastname:'schmude', name:'frankie'})
+	}
+
+	function test3(){
+		Snap.setData('test',function(d){
+			d.name = 'jack'
+			return d
+		})
+	}
+
+	function process(data){
+		if(data.name==='jason'){
+			data.name = 'jason sucks'
+		}
+		return data
+	}
+
+	function test4(){
+		Snap.setProcess('test',process)
+	}
+	function test5(){
+		Snap.removeProcess('test',process)
+	}
+	//Snap.render();
+</script>
+
+</body>
+
+</html>
