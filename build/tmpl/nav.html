@@ -1,0 +1,5 @@
+<ul class="nav">
+	{{#each children}}
+	<li data-index="{{@index}}" {{selected}} onclick="Nav.select(this)">{{{label}}}</li>
+	{{/each}}
+</ul>

@@ -92,8 +92,6 @@ Options:
 // 	CHANGE:'snap-change'
 // }
 
-console.log('Snap 0.1.0')
-
 var Snap = (function(){
 
 	var SnapData = function(config){
@@ -153,8 +151,12 @@ var Snap = (function(){
 			if(listeners[eventType]){
 				var i = listeners[eventType].length
 				while(i--){
-					listeners[eventType][i].callback.call(self, self.getData(), {type:eventType, target:self})
+					try {
+						listeners[eventType][i].callback.call(self, self.getData(), {type:eventType, target:self})
+					} catch(err) {
+					}
 				}
+				//console.log('dispatch',eventType,config.dataType,config.dataKey)
 				$(window).trigger('snap-'+eventType,[{key:config.dataKey, type:config.dataType, snapData:self}])
 			}
 		}
@@ -266,6 +268,10 @@ var Snap = (function(){
 			return false
 		}
 
+		function triggerChange(){
+			dispatchEvent('change')
+		}
+
 		self.on = on
 		self.off = off
 		self.getData = getData
@@ -273,6 +279,8 @@ var Snap = (function(){
 		self.setProcess = setProcess
 		self.removeProcess = removeProcess
 		self.setConfig = setConfig
+		self.triggerChange = triggerChange
+		self.dispatchEvent = dispatchEvent
 	}
 
 	function SnapElement(el, config){
@@ -281,9 +289,8 @@ var Snap = (function(){
 		var tmplKey = config.tmpl || getAttr(el,'data-tmpl','')
 		var dataKey = config.data || getAttr(el,'data-watch',tmplKey)
 		var ctrlKey = config.ctrl || getAttr(el,'data-ctrl',tmplKey)
-		var filterKey = config.filter || getAttr(el,'data-filter','')
+		var filterKey = config.filter || getAttr(el,'data-filter',tmplKey)
 		var snapIndex = snaps.push(this)-1
-		var tmplIndex = 0
 		var innerHTML = ''
 
 		function info(){
@@ -299,7 +306,10 @@ var Snap = (function(){
 		}
 
 		function setTmplKey(key){
+			//console.log('SnapElement.setTmplKey',key,tmplKey,dataKey)
+			getTemplateObject(tmplKey).off('change',render)
 			tmplKey = key
+			getTemplateObject(tmplKey).on('change',render)
 			render()
 		}
 
@@ -308,7 +318,10 @@ var Snap = (function(){
 		}
 
 		function setDataKey(key){
+			//console.log('SnapElement.setDataKey',key,tmplKey,dataKey)
+			getDataObject(dataKey).off('change',render)
 			dataKey = key
+			getDataObject(dataKey).on('change',render)
 			render()
 		}
 
@@ -336,14 +349,19 @@ var Snap = (function(){
 
 		function init(){
 			$el.attr('snap-index',snapIndex)
-			getDataObject(dataKey).on('change',render)
-			getTemplateObject(tmplKey).on('change',render)
+			setDataKey(dataKey)
+			setTmplKey(tmplKey)
+			//getDataObject(dataKey).on('change',render)
+			//getTemplateObject(tmplKey).on('change',render)
 			render()
 		}
 
+		// this is not used yet
 		function kill(){
 			getDataObject(dataKey).off('change',render)
+			getTemplateObject(tmplKey).off('change',render)
 		}
+
 		this.render = render
 		this.empty = empty
 		this.info = info
@@ -369,7 +387,7 @@ var Snap = (function(){
 	}
 
 	function isDomElement(e){
-		return e instanceof jQuery || (e && e.tagName)
+		return (window.jQuery && e instanceof window.jQuery) || (e && e.tagName)
 	}
 
 	function getSnapElement(el,createIfNotExists){
@@ -399,6 +417,7 @@ var Snap = (function(){
 			key = s.info().dataKey
 		}
 		if(!datas[key]){
+			// each data needs a default temlate - create if it does not exist
 			datas[key] = new SnapData({dataType:'data', dataKey:key})
 		}
 		return datas[key]
@@ -432,6 +451,48 @@ var Snap = (function(){
 			}
 		}
 		return getDataObject(key).setConfig(config)
+	}
+
+	//
+	// templates
+	//
+
+	function defaultTemplate(data){
+		return debugLevel>1 ? JSON.stringify(data) : ''
+	}
+
+	function getTemplateObject(key){
+		var s = getSnapElement(key,true)
+		if(s){
+			key = s.info().tmplKey
+		}
+		if(!tmpls[key]){
+			tmpls[key] = new SnapData({dataKey:key, dataType:'tmpl', data:defaultTemplate})
+		}
+		return tmpls[key]
+	}
+
+	function setTemplate(key, data){
+		//console.log('setTemplate(',key,data,')')
+		if(isDomElement(key)){
+			var s = getSnapElement(key)
+			if(s) s.setTmplKey(data)
+			return
+		} else if($.type(data)==='string'){
+			data = Handlebars.compile(data)
+			Handlebars.registerPartial(key,data)
+			var tmpl = getTemplateObject(key).setData(data,{overwrite:true})
+			getDataObject(key).triggerChange()
+			return tmpl
+		}
+	}
+
+	function getTemplate(key){
+		return getTemplateObject(key).getData()
+	}
+
+	function getTemplates(){
+		return tmpls
 	}
 
 	//
@@ -474,46 +535,6 @@ var Snap = (function(){
 	}
 
 	//
-	// templates
-	//
-
-	function defaultTemplate(data){
-		return JSON.stringify(data)
-	}
-
-	function getTemplateObject(key){
-		var s = getSnapElement(key,true)
-		if(s){
-			key = s.info().tmplKey
-		}
-		if(!tmpls[key]){
-			tmpls[key] = new SnapData({dataKey:key, dataType:'tmpl', data:defaultTemplate})
-		}
-		return tmpls[key]
-	}
-
-	function setTemplate(key, data){
-		if(isDomElement(key)){
-			var s = getSnapElement(key)
-			if(s) s.setTmplKey(data)
-			return
-		}
-		if($.type(data)==='string'){
-			data = Handlebars.compile(data)
-			Handlebars.registerPartial(key,data)
-		}
-		return getTemplateObject(key).setData(data,{overwrite:true})
-	}
-
-	function getTemplate(key){
-		return getTemplateObject(key).getData()
-	}
-
-	function getTemplates(){
-		return tmpls
-	}
-
-	//
 	//
 	//
 
@@ -552,6 +573,7 @@ var Snap = (function(){
 		if(!$.isArray(files)){
 			files = [files]
 		}
+
 		$.when.apply($,$.map(files, function(f){
 
 			if($.type(f)==='string'){
@@ -562,16 +584,19 @@ var Snap = (function(){
 				f.key = f.key || f.filename || f.url.split('/').pop().split('.')[0]
 			}
 
-			return $.ajax({
-				url:f.url,
-				config:f
-			})
-		    .done(function(content) {
-				Snap.setTemplate(this.config.key,content)
-		    })
-		    .fail(function() {
-		        console.error('Could not load template',this.config)
-		    })
+			// skip if template already exists
+			if(!tmpls[f.key]){
+				return $.ajax({
+					url:f.url,
+					config:f
+				})
+			    .done(function(content) {
+					setTemplate(this.config.key,content)
+			    })
+			    .fail(function() {
+			        console.error('Could not load template',this.config)
+			    })
+			}
 		})).done(function(){
 			if(config.callback) config.callback()
 		})
@@ -623,11 +648,22 @@ var Snap = (function(){
 		nextRequest()
 	}
 
+	var debugLevel = 0
+	function setDebug(n){
+		debugLevel = n
+	}
+
+	function version(){
+		return '0.1.0'
+	}
+
 	$(document).ready(function(){
 		render()
 	})
 
 	return {
+		version:version,
+		setDebug:setDebug,
 		request:request,
 		refresh:refresh,
 		render:render,
@@ -643,6 +679,7 @@ var Snap = (function(){
 		element:SnapElement,
 		watchData:watchData,
 		unwatchData:unwatchData,
-		loadTemplate:loadTemplate
+		loadTemplate:loadTemplate,
+		getSnapElement:getSnapElement
 	}
 })()

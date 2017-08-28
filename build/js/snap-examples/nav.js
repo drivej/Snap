@@ -1,6 +1,13 @@
 var Nav = (function(self){
 
-	Snap.setTemplate('nav','<ul class="nav">{{#each children}}<li data-index="{{@index}}" {{selected}} onclick="Nav.select(this)">{{{label}}}</li>{{/each}}</ul>');
+	Snap.loadTemplate([
+		'nav'
+	],{
+		baseUrl:'/tmpl/', 
+		ext:'.html'
+	})
+
+	//Snap.setTemplate('nav','<ul class="nav">{{#each children}}<li data-index="{{@index}}" {{selected}} onclick="Nav.select(this)">{{{label}}}</li>{{/each}}</ul>');
 
 	Snap.setData('nav',{
 		children:[
